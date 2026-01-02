@@ -22,7 +22,8 @@ const Login = ({ onLoginSuccess }) => {
 
         try {
             // Real Auth Call
-            const res = await axios.post('http://localhost:8000/login', formData);
+            const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+            const res = await axios.post(`${apiBase}/login`, formData);
 
             // If we get here, it means success (200 OK)
             // In a real app we might store the token: res.data.tokens

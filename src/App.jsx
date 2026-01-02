@@ -12,7 +12,7 @@ function App() {
     useEffect(() => {
         if (isLoggedIn) {
             // Connect to Backend WebSocket
-            ws.current = new WebSocket('ws://localhost:8000/ws');
+            ws.current = new WebSocket(import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws');
 
             ws.current.onopen = () => {
                 console.log('Connected to Market Data Stream');
