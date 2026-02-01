@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Login from './components/Login';
 import MarketStrength from './components/MarketStrength';
 import StockChartModal from './components/StockChartModal';
+import SymbolSearch from './components/SymbolSearch';
 import './index.css';
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
     const [historyData, setHistoryData] = useState([]);
     const [isChartLoading, setIsChartLoading] = useState(false);
     const [isChartOpen, setIsChartOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const ws = useRef(null);
 
     // WebSocket Connection Logic
@@ -42,15 +44,11 @@ function App() {
         }
     }, [isLoggedIn]);
 
-    const handleStockClick = async (symbol) => {
-        setSelectedStock(symbol);
-        setIsChartOpen(true);
+    const fetchStockHistory = async (symbol, interval = 'ONE_DAY', days = 30) => {
         setIsChartLoading(true);
-        setHistoryData([]);
-
         try {
             const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-            const response = await fetch(`${baseUrl}/stock-history/${symbol}`);
+            const response = await fetch(`${baseUrl}/stock-history/${symbol}?interval=${interval}&days=${days}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch history');
             }
@@ -58,10 +56,17 @@ function App() {
             setHistoryData(data);
         } catch (error) {
             console.error("Error fetching history:", error);
-            // Optionally set query state or empty data
+            setHistoryData([]);
         } finally {
             setIsChartLoading(false);
         }
+    };
+
+    const handleStockClick = (symbol) => {
+        setSelectedStock(symbol);
+        setIsChartOpen(true);
+        setHistoryData([]);
+        fetchStockHistory(symbol, 'ONE_DAY', 30);
     };
 
     return (
@@ -91,23 +96,38 @@ function App() {
             {!isLoggedIn ? (
                 <Login onLoginSuccess={() => setIsLoggedIn(true)} />
             ) : (
-                <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <SymbolSearch
+                        onAdd={(symbol) => console.log('Added', symbol)}
+                        onQueryChange={(val) => setSearchQuery(val.toUpperCase())}
+                    />
+
                     {marketData && marketData.length > 0 ? (
                         <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(4, 1fr)', // 4 columns
-                            gap: '0.25rem', // Tight gap
-                            width: '100%',
-                            maxWidth: '100%', // Use full width
-                            padding: '0.5rem'
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                            gap: '1rem',
+                            width: '95%',
+                            maxWidth: '1400px'
                         }}>
-                            {[...marketData].sort((a, b) => b.strengthPercent - a.strengthPercent).map((stock) => (
-                                <MarketStrength
-                                    key={stock.symbol}
-                                    data={stock}
-                                    onClick={handleStockClick}
-                                />
-                            ))}
+                            {[...marketData]
+                                .sort((a, b) => {
+                                    if (searchQuery) {
+                                        const aMatch = a.symbol.includes(searchQuery);
+                                        const bMatch = b.symbol.includes(searchQuery);
+                                        if (aMatch && !bMatch) return -1;
+                                        if (!aMatch && bMatch) return 1;
+                                    }
+                                    // If no search query, or both/neither match, sort by strengthPercent
+                                    return b.strengthPercent - a.strengthPercent;
+                                })
+                                .map((stock, index) => (
+                                    <MarketStrength
+                                        key={stock.symbol || index}
+                                        data={stock}
+                                        onClick={() => handleStockClick(stock.symbol)}
+                                    />
+                                ))}
                         </div>
                     ) : (
                         <div className="glass-panel" style={{ padding: '2rem', color: '#94a3b8' }}>
@@ -123,6 +143,7 @@ function App() {
                 symbol={selectedStock}
                 data={historyData}
                 loading={isChartLoading}
+                onTimeframeChange={(interval) => fetchStockHistory(selectedStock, interval)}
             />
         </div>
     );
